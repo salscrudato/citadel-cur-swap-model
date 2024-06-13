@@ -1,0 +1,14 @@
+# Exclude all folders
+3M2Y/
+Archive/
+CNR/
+IV/
+TOT/
+Working Code - Old/
+
+# Include specific files
+!Front End Data.csv
+!README.md
+!bbg_codes.xlsx
+!Backtest.py
+!signal_test_final.py
