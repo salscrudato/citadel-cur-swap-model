@@ -7,18 +7,15 @@ import plotly.graph_objects as go
 import plotly.offline as pyo
 
 test_type = "CNR"
+test_sub_type = "Z Score"
 method = "EWMA"
-smoothing = "10"
 z_score = "4"
+smoothing = "5"
 
 # Suppress specific warnings
 warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format, so each element will be parsed individually")
 
-# Define the directory path for the portfolios
-directory_path = f'/Users/salscrudato/Finance Tests/{test_type}/Smooth {smoothing}/'
-
-file_paths = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith('.csv')]
-
+# Define the function to load and process data
 def load_and_process_data(file_path):
     df = pd.read_csv(file_path, index_col=[0, 1], parse_dates=True)
 
@@ -106,99 +103,54 @@ def calculate_statistics(df, return_type='gross'):
     }
 
 def compare_portfolios(directory_path):
-    # Get a list of all CSV files in the directory
     file_paths = [os.path.join(directory_path, file) for file in os.listdir(directory_path) if file.endswith('.csv')]
-
     all_stats = []
     all_files = []
 
     for file_path in file_paths:
         df = load_and_process_data(file_path)
-
-        # Calculate statistics for the portfolio for gross and net returns
-        stats_gross = calculate_statistics(df, return_type='gross')
         stats_net = calculate_statistics(df, return_type='net')
-
-        # Combine the statistics into a single dictionary for the portfolio
-        stats = {**stats_gross, **stats_net}
-        
-        # Extract the number at the end of the file name for indexing
         file_number = re.search(r'\d+$', os.path.splitext(os.path.basename(file_path))[0])
         if file_number:
             index_value = int(file_number.group())
         else:
-            index_value = os.path.basename(file_path)  # Use file name if no number found
-        
+            index_value = os.path.basename(file_path)
         all_files.append(index_value)
-        stats['File'] = os.path.basename(file_path)
-        
-        all_stats.append((index_value, stats))
+        stats_net['File'] = os.path.basename(file_path)
+        all_stats.append((index_value, stats_net))
 
-    # Create a DataFrame to display the statistics for all portfolios
     comparison_df = pd.DataFrame([stats for index, stats in all_stats], index=[index for index, stats in all_stats])
-
-    # Ensure the DataFrame only contains numeric data for the mean calculation
     numeric_cols = comparison_df.select_dtypes(include=[np.number]).columns
     comparison_df = comparison_df[numeric_cols]
 
     return comparison_df
 
-comparison_df = compare_portfolios(directory_path)
-# Specify the columns to include
-columns_to_include = ['Sharpe Ratio (gross)', 'Average Trades per Day (gross)', 'Sharpe Ratio (net)']
-
-# Create a new DataFrame with only the specified columns
-aaa_comparison_summary = comparison_df[columns_to_include]
-
-# Load and process data for each portfolio
-dfs = [load_and_process_data(file_path) for file_path in file_paths]
-
-# Extract the cumulative net return for each portfolio
-cumulative_net_returns = [df[['Portfolio_CUM_NET_RETURN']] for df in dfs]
-
-# Concatenate the cumulative net returns into a single DataFrame
-combined_df = pd.concat(cumulative_net_returns, axis=1)
-
-# Rename the columns to reflect the portfolio names
-combined_df.columns = [f'Portfolio_{i+1}_CUM_NET_RETURN' for i in range(len(dfs))]
-
-# Ensure the DataFrame contains data from 2013 onwards
-combined_df = combined_df[combined_df.index.get_level_values('Date') >= pd.Timestamp('2013-01-01')]
-
-# Ensure the data is correctly formatted without duplicates
-comparison_df = comparison_df.groupby(comparison_df.index).mean()
-
-# Create the interactive plot
+# Initialize the plot
 fig = go.Figure()
 
-# Add Sharpe Ratio (net) trace
-fig.add_trace(go.Scatter(
-    x=comparison_df.index,
-    y=comparison_df['Sharpe Ratio (net)'],
-    mode='lines+markers',
-    name='Sharpe Ratio (net)',
-    line=dict(shape='linear', width=1),
-    marker=dict(symbol='circle', size=2)
-))
+for smoothing in range(1, 11):
+    directory_path = f'/Users/salscrudato/Finance Tests/Outputs/{test_type}/Smooth {smoothing}/'
+    comparison_df = compare_portfolios(directory_path)
+    comparison_df = comparison_df.groupby(comparison_df.index).mean()
 
-# Add Sharpe Ratio (gross) trace
-fig.add_trace(go.Scatter(
-    x=comparison_df.index,
-    y=comparison_df['Sharpe Ratio (gross)'],
-    mode='lines+markers',
-    name='Sharpe Ratio (gross)',
-    line=dict(shape='linear', width=1),
-    marker=dict(symbol='circle', size=2)
-))
+    # Add trace for the net Sharpe ratio of each smoothing value
+    fig.add_trace(go.Scatter(
+        x=comparison_df.index,
+        y=comparison_df['Sharpe Ratio (net)'],
+        mode='lines+markers',
+        name=f'Smoothing {smoothing}',
+        line=dict(shape='linear', width=1),
+        marker=dict(symbol='circle', size=2)
+    ))
 
 # Customize the layout
 fig.update_layout(
-    title=f'Sharpe Ratios for {test_type} using Smoothing of {smoothing} and Z Capped at {z_score}',
+    title=f'Net Sharpe Ratios for {test_type} | Z Score Capped at {z_score}',
     xaxis_title='Half Life',
-    yaxis_title='Sharpe Ratio',
+    yaxis_title='Net Sharpe Ratio',
     xaxis=dict(
         tickmode='array',
-        tickvals=list(comparison_df.index)[::25],  # Show fewer ticks to reduce clutter
+        tickvals=list(comparison_df.index)[::25],
         ticktext=[str(i) for i in list(comparison_df.index)[::25]]
     ),
     legend=dict(x=0.01, y=0.99),
@@ -209,8 +161,7 @@ fig.update_layout(
 )
 
 # Construct the filename using the variables
-filename = f'Sharpe_Ratios_{test_type}_Smoothing_{smoothing}_Z_{z_score}.html'
+filename = f'Net_Sharpe_Ratios_{test_type}_Various_Smoothing_Z_{z_score}.html'
 
 # Save the plot with the constructed filename
 pyo.plot(fig, filename=filename)
-

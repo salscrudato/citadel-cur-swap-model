@@ -120,6 +120,15 @@ def calculate_metrics(df, col, cur, prefix, hl_smooth, hl_lookback, z_score_lowe
 
     return df
 
+def calculate_metrics_for_all_currencies(df, grouped_columns, prefix, hl_lookback, hl_smooth, z_score_lower, z_score_upper):
+    """
+    Calculate metrics for all currencies.
+    """
+    for col in grouped_columns[f'_{prefix}']:
+        currency = col.split('_')[0]
+        df = calculate_metrics(df, col, currency, prefix, hl_smooth, hl_lookback, z_score_lower, z_score_upper)
+    return df
+
 def calculate_cnr_metrics(df, col_3m2y, col_2y, cur, hl_smooth, hl_lookback, z_score_lower, z_score_upper):
     """
     Calculate CNR metrics for a given DataFrame and parameters.
@@ -139,15 +148,6 @@ def calculate_cnr_metrics_for_all_currencies(df, grouped_columns, hl_lookback, h
         col_2y = next((col for col in grouped_columns['_2Y'] if col.startswith(currency)), None)
         if col_3m2y and col_2y:
             df = calculate_cnr_metrics(df, col_3m2y, col_2y, currency, hl_smooth, hl_lookback, z_score_lower, z_score_upper)
-    return df
-
-def calculate_metrics_for_all_currencies(df, grouped_columns, prefix, hl_lookback, hl_smooth, z_score_lower, z_score_upper):
-    """
-    Calculate metrics for all currencies.
-    """
-    for col in grouped_columns[f'_{prefix}']:
-        currency = col.split('_')[0]
-        df = calculate_metrics(df, col, currency, prefix, hl_smooth, hl_lookback, z_score_lower, z_score_upper)
     return df
 
 def calculate_msci_metrics(df, cols_msci, cols_fx, hl_lookback, hl_smooth, z_score_lower, z_score_upper):
@@ -334,19 +334,22 @@ These are the variables to change for testing.
 
 """
 test_type = 'CNR'
+test_sub_type = 'ZScore'
 min_trade_size = 2500
 target_volatility = 15000.00
 risk_aversion = 1.0
-hl_smooth = 5
-z_score_upper = 4
-z_score_lower = -4
+
+z_score_tmp = 5
+z_score_upper = z_score_tmp
+z_score_lower = z_score_upper * -1
+
 z_score_upper_3m2y = 4
 z_score_lower_3m2y = -4
 
-
-default_hl_start = 170
-default_hl_end = 171
-default_hl_skip = 1
+hl_smooth = 5
+default_hl_start = 5
+default_hl_end = 505
+default_hl_skip = 5
 
 # Define constants as variables
 rolling_window = 5
@@ -411,7 +414,7 @@ These are the variables to change for testing.
 
 # Loop through the range of half-life values
 for tmp_hl in range(hl_start, hl_end, hl_skip):
-    print(f"Running for {test_type} Half Life = {tmp_hl}")
+    print(f"Running for {test_type}, {test_sub_type}, Z Score = {z_score_upper} Half Life = {tmp_hl}")
 
     # Define half-life lookback for different metrics
     hl_lookback_cnr = tmp_hl
@@ -441,10 +444,17 @@ for tmp_hl in range(hl_start, hl_end, hl_skip):
 
     # Initialize the results list
     results_list = []
-
-    # Specify the desired output file path
-    output_file = f'{test_type}/final_{test_type}_smooth_{hl_smooth}_hl_{tmp_hl}.csv'
     
+    # Specify the desired output file path
+    output_file = f'Outputs/{test_type}/{test_sub_type}/{test_type}_smooth{hl_smooth}_zscore{z_score_upper}_hl{tmp_hl}.csv'
+
+    # Extract the directory path
+    output_dir = os.path.dirname(output_file)
+    
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     # Calculate CNR metrics
     calculate_cnr_metrics_for_all_currencies(df=df, grouped_columns=grouped_columns,
                                              hl_lookback=hl_lookback_cnr, hl_smooth=hl_smooth,
